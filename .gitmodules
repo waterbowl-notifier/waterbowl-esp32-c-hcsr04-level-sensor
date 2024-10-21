@@ -7,3 +7,6 @@
 [submodule "components/gecl-misc-util-manager"]
 	path = components/gecl-misc-util-manager
 	url = https://github.com/gamename-esp32-component-library/GECL-misc-util-manager
+[submodule "components/gecl-ota-manager"]
+	path = components/gecl-ota-manager
+	url = https://github.com/gamename-esp32-component-library/GECL-ota-manager
