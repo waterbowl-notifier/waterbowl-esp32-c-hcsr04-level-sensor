@@ -1,0 +1,3 @@
+[submodule "components/gecl-wifi-manager"]
+	path = components/gecl-wifi-manager
+	url = https://github.com/gamename-esp32-component-library/GECL-wifi-manager
