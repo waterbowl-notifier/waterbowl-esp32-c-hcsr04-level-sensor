@@ -6,32 +6,28 @@ set(SOURCES
 
 set(INCLUDES 
     "."
-    "certs"
-)
+ )
 
-# Initialize variables to prevent errors if not set
-set(CERT_HEADER "")
-set(KEY_HEADER "")
+# Get all the component include directories
+file(GLOB_RECURSE COMPONENT_SOURCES "components/*/*.c")
+
+file(GLOB_RECURSE COMPONENT_INCLUDES "components/*/include")
 
 # Determine which configuration is selected
-if(CONFIG_LIVING_ROOM)
-    add_compile_definitions(LIVING_ROOM)
-    set(CERT_HEADER "certs/WaterBowl_LivingRoom-certificate.h")
-    set(KEY_HEADER "certs/WaterBowl_LivingRoom-private.pem.h")
-elseif(CONFIG_DINING_ROOM)
-    add_compile_definitions(DINING_ROOM)
-    set(CERT_HEADER "certs/WaterBowl_DiningRoom-certificate.h")
-    set(KEY_HEADER "certs/WaterBowl_DiningRoom-private.pem.h")
+if(CONFIG_LOCATION_LIVING_ROOM)
+    set(CERT_INCLUDES  "certs/include/living")
+elseif(CONFIG_LOCATION_DINING_ROOM)
+    set(CERT_INCLUDES  "certs/include/dining")
 endif()
 
 idf_component_register(
     SRCS 
         ${SOURCES} 
+        ${COMPONENT_SOURCES}
     INCLUDE_DIRS 
         ${INCLUDES} 
-    EMBED_TXTFILES 
-        ${CERT_HEADER} 
-        ${KEY_HEADER}
+        ${COMPONENT_INCLUDES}
+        ${CERT_INCLUDES}
 )
 
 message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")

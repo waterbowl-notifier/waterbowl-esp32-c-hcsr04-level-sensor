@@ -16,6 +16,9 @@
 #include "gecl-misc-util-manager.h"
 #include "gecl-ultrasonic-manager.h"
 
+#include "certificate.h"
+#include "key.h"
+
 static const char *TAG = "WATER_BOWL";
 const char *device_name = CONFIG_WIFI_HOSTNAME;
 
@@ -26,19 +29,8 @@ esp_mqtt_client_handle_t mqtt_client_handle = NULL;
 
 char mac_address[18];
 
-#ifdef LivingRoom
-#include "WaterBowl_LivingRoom-certificate.h"
-#include "WaterBowl_LivingRoom-private.pem.h"
-const uint8_t *cert = WaterBowl_LivingRoom_certificate_pem;
-const uint8_t *key = WaterBowl_LivingRoom_private_pem_key;
-#elif defined(DiningRoom)
-#include "WaterBowl_DiningRoom-certificate.h"
-#include "WaterBowl_DiningRoom-private.pem.h"
-const uint8_t *cert = WaterBowl_DiningRoom_certificate_pem;
-const uint8_t *key = WaterBowl_DiningRoom_private_pem_key;
-#else
-#error "Please define a location for the water bowl"
-#endif
+extern const uint8_t *certificate;
+extern const uint8_t *key;
 
 void record_local_mac_address(char *mac_str)
 {
@@ -297,7 +289,7 @@ void app_main()
     mqtt_set_event_data_handler(custom_handle_mqtt_event_data);
     mqtt_set_event_error_handler(custom_handle_mqtt_event_error);
 
-    mqtt_config_t config = {.certificate = cert, .private_key = key, .broker_uri = CONFIG_AWS_IOT_ENDPOINT};
+    mqtt_config_t config = {.certificate = certificate, .private_key = key, .broker_uri = CONFIG_AWS_IOT_ENDPOINT};
 
     mqtt_client_handle = init_mqtt(&config);
 
