@@ -19,3 +19,6 @@
 [submodule "components/gecl-time-sync-manager"]
 	path = components/gecl-time-sync-manager
 	url = https://github.com/gamename-esp32-component-library/GECL-time-sync-manager
+[submodule "components/gecl-ultrasonic-manager"]
+	path = components/gecl-ultrasonic-manager
+	url = https://github.com/gamename-esp32-component-library/GECL-ultrasonic-manager
