@@ -4,7 +4,8 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/Users/tennis/esp/esp-idf/components/**",
+                "${workspaceFolder}/components/**",
+                "/Users/tennis/esp/esp-idf/components/**"
             ],
             "defines": [],
             "macFrameworkPath": [
@@ -12,7 +13,8 @@
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
-            "cppStandard": "c++17"
+            "cppStandard": "c++17",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
         }
     ],
     "version": 4

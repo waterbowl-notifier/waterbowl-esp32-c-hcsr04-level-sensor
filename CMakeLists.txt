@@ -5,8 +5,4 @@ cmake_minimum_required(VERSION 3.5)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Define the project name
-project(waterbowl-sensor)
-
-set(EXTRA_COMPONENT_DIRS ${CMAKE_SOURCE_DIR}/main)
-message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
-
+project(firmware)
