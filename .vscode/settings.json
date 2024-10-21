@@ -1,0 +1,28 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "workbench.startupEditor": "none",
+    "terminal.integrated.profiles.osx": {
+        "MyCustomProfile": {
+            "path": "/bin/zsh",
+            "args": [
+                "-c",
+                "source ~/.zshrc && setidf && exec zsh"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.osx": "MyCustomProfile",
+    "bash": {
+        "path": "bash",
+        "args": [
+            "-l"
+        ],
+        "icon": "terminal-bash"
+    },
+    "zsh": {
+        "path": "zsh",
+        "args": [
+            "-l"
+        ]
+    }
+}
+}
