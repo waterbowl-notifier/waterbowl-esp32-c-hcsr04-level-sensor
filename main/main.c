@@ -1,3 +1,10 @@
+/*
+ToDo:
+- Get OTA working
+- Get MQTT working
+- Get RGB LED working
+- Get periodic distance measurement working
+*/
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
