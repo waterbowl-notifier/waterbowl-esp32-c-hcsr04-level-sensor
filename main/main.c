@@ -23,9 +23,6 @@ ToDo:
 #include "gecl-misc-util-manager.h"
 #include "gecl-ultrasonic-manager.h"
 
-#include "aws_certificate.h"
-#include "aws_key.h"
-
 #define ORPHAN_TIMEOUT pdMS_TO_TICKS(7200000) // 2 hours in milliseconds
 
 static const char *TAG = "WATER_BOWL";
@@ -38,8 +35,12 @@ esp_mqtt_client_handle_t mqtt_client_handle = NULL;
 
 char mac_address[18];
 
-extern unsigned char aws_certificate[];
-extern unsigned char aws_key[];
+extern const uint8_t certificate[];
+extern const uint8_t key[];
+extern const uint8_t AmazonRootCA1_pem[];
+const uint8_t *my_cert = certificate;
+const uint8_t *my_key = key;
+const uint8_t *my_root_ca = AmazonRootCA1_pem;
 
 // Callback function for timer expiration
 void orphan_timer_callback(TimerHandle_t xTimer)
@@ -265,7 +266,7 @@ void ultrasonic_read_task(void *pvParameter)
 
         // Prepare the payload (you can format it however you like)
         char payload[100];
-        snprintf(payload, sizeof(payload), "{\"water_level\": %.1f, \"hostname\": %s }", distance, CONFIG_LOCATION);
+        snprintf(payload, sizeof(payload), "{\"water_level\": \"%.1f\", \"hostname\": \"%s\" }", distance, CONFIG_LOCATION);
 
         // Publish to MQTT topic
         int msg_id = esp_mqtt_client_publish(mqtt_client_handle, CONFIG_PUBLISH_WATER_LEVEL_TOPIC, payload, 0, 1, 0);
@@ -299,9 +300,13 @@ void app_main()
     mqtt_set_event_data_handler(custom_handle_mqtt_event_data);
     mqtt_set_event_error_handler(custom_handle_mqtt_event_error);
 
-    ESP_LOGI(TAG, "Cert size: %d, Key size: %d", sizeof(aws_certificate), sizeof(aws_key));
+    // ESP_LOGI(TAG, "Cert size: %d, Key size: %d", sizeof(certificate), sizeof(key));
 
-    mqtt_config_t config = {.certificate = (uint8_t *)aws_certificate, .private_key = (uint8_t *)aws_key, .broker_uri = CONFIG_IOT_ENDPOINT};
+    mqtt_config_t config = {
+        .root_ca = my_root_ca,
+        .certificate = my_cert,
+        .private_key = my_key,
+        .broker_uri = CONFIG_IOT_ENDPOINT};
 
     mqtt_client_handle = init_mqtt(&config);
 
