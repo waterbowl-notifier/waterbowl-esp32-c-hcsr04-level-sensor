@@ -36,6 +36,8 @@ TimerHandle_t orphan_timer = NULL;
 
 esp_mqtt_client_handle_t mqtt_client_handle = NULL;
 
+char mac_address[18];
+
 extern unsigned char certificate[];
 extern unsigned char key[];
 
@@ -66,12 +68,11 @@ void custom_handle_mqtt_event_connected(esp_mqtt_event_handle_t event)
     ESP_LOGI(TAG, "Custom handler: MQTT_EVENT_CONNECTED");
     int msg_id;
 
-    // msg_id = esp_mqtt_client_subscribe(client, CONFIG_MQTT_SUBSCRIBE_OTA_UPDATE_SNOOPER_TOPIC, 0);
-    // ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_MQTT_SUBSCRIBE_OTA_UPDATE_SNOOPER_TOPIC, msg_id);
+    msg_id = esp_mqtt_client_subscribe(client, CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, 0);
+    ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, msg_id);
 
-    // msg_id =
-    //     esp_mqtt_client_publish(client, CONFIG_MQTT_PUBLISH_STATUS_TOPIC, "{\"message\":\"status_request\"}", 0, 0, 0);
-    // ESP_LOGI(TAG, "Published initial status request, msg_id=%d", msg_id);
+    msg_id = esp_mqtt_client_subscribe(client, CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, 0);
+    ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, msg_id);
 }
 
 void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event)
@@ -124,6 +125,7 @@ void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event)
     if (json == NULL)
     {
         ESP_LOGE(TAG, "Failed to parse JSON");
+        error_reload(mqtt_client_handle);
     }
     else
     {
@@ -213,26 +215,19 @@ void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event)
 
     // Reset the orphan timer whenever a message is received
     reset_orphan_timer();
-    /*
-        if (strncmp(event->topic, CONFIG_MQTT_SUBSCRIBE_STATUS_TOPIC, event->topic_len) == 0)
-        {
-            custom_handle_mqtt_event_subscribe(event);
-        }
-        else if (strncmp(event->topic, CONFIG_MQTT_SUBSCRIBE_SELF_TEST_SNOOPER_TOPIC, event->topic_len) == 0)
-        {
-            // Use the global mac_address variable to pass the MAC address to the self-test function
-            custom_handle_mqtt_event_self_test(event, mac_address);
-        }
-        else if (strncmp(event->topic, CONFIG_MQTT_SUBSCRIBE_OTA_UPDATE_SNOOPER_TOPIC, event->topic_len) == 0)
-        {
-            // Use the global mac_address variable to pass the MAC address to the OTA function
-            custom_handle_mqtt_event_ota(event, mac_address);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Un-Handled topic %.*s", event->topic_len, event->topic);
-        }
-    */
+    if (strncmp(event->topic, CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, event->topic_len) == 0)
+    {
+        custom_handle_mqtt_event_subscribe(event);
+    }
+    else if (strncmp(event->topic, CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, event->topic_len) == 0)
+    {
+        // Use the global mac_address variable to pass the MAC address to the OTA function
+        custom_handle_mqtt_event_ota(event, mac_address);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Un-Handled topic %.*s", event->topic_len, event->topic);
+    }
 }
 
 void custom_handle_mqtt_event_error(esp_mqtt_event_handle_t event)
@@ -255,13 +250,47 @@ void custom_handle_mqtt_event_error(esp_mqtt_event_handle_t event)
     error_reload(mqtt_client_handle);
 }
 
+void ultrasonic_read_task(void *pvParameter)
+{
+    while (1)
+    {
+        // Ensure sensor is initialized
+        if (!hcsr04_is_initialized())
+        {
+            hcsr04_init();
+        }
+
+        // Read the range in cm
+        float distance = hcsr04_get_range();
+
+        // Prepare the payload (you can format it however you like)
+        char payload[100];
+        snprintf(payload, sizeof(payload), "{\"water_level\": %.1f, \"hostname\": %s }", distance, CONFIG_LOCATION);
+
+        // Publish to MQTT topic
+        int msg_id = esp_mqtt_client_publish(mqtt_client_handle, CONFIG_PUBLISH_WATER_LEVEL_TOPIC, payload, 0, 1, 0);
+        if (msg_id == -1)
+        {
+            ESP_LOGE("MQTT", "Failed to publish message");
+        }
+        else
+        {
+            ESP_LOGI("MQTT", "Published message: %s", payload);
+        }
+
+        // Delay for configured time interval (convert minutes to ticks)
+        vTaskDelay(CONFIG_WATER_LEVEL_CHECK_INTERVAL_MIN * 60 * 1000 / portTICK_PERIOD_MS);
+    }
+}
+
 void app_main()
 {
     init_nvs();
 
     init_wifi();
 
-    show_mac_address();
+    get_device_mac_address(mac_address);
+    ESP_LOGI(TAG, "MAC Address: %s", mac_address);
 
     init_time_sync();
 
@@ -293,11 +322,10 @@ void app_main()
         error_reload(mqtt_client_handle);
     }
 
-    hcsr04_init();
+    xTaskCreate(&ultrasonic_read_task, "ultrasonic_read_task", 4096, NULL, 5, NULL);
 
     while (true)
     {
-        ESP_LOGI(TAG, "Distance: %.1f cm", hcsr04_get_range());
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
