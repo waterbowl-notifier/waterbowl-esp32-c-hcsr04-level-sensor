@@ -1,0 +1,26 @@
+{
+  "things": [
+    {
+      "thingName": "living-room",
+      "thingTypeName": "water-bowl",
+      "attributePayload": {
+        "attributes": {
+          "Location": "LivingRoom",
+          "SensorType": "HCSR04"
+        },
+        "merge": false
+      }
+    },
+    {
+      "thingName": "dining-room",
+      "thingTypeName": "water-bowl",
+      "attributePayload": {
+        "attributes": {
+          "Location": "DiningRoom",
+          "SensorType": "HCSR04"
+        },
+        "merge": false
+      }
+    }
+  ]
+}

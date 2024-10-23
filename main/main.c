@@ -23,8 +23,8 @@ ToDo:
 #include "gecl-misc-util-manager.h"
 #include "gecl-ultrasonic-manager.h"
 
-#include "certificate.h"
-#include "key.h"
+#include "aws_certificate.h"
+#include "aws_key.h"
 
 #define ORPHAN_TIMEOUT pdMS_TO_TICKS(7200000) // 2 hours in milliseconds
 
@@ -38,8 +38,8 @@ esp_mqtt_client_handle_t mqtt_client_handle = NULL;
 
 char mac_address[18];
 
-extern unsigned char certificate[];
-extern unsigned char key[];
+extern unsigned char aws_certificate[];
+extern unsigned char aws_key[];
 
 // Callback function for timer expiration
 void orphan_timer_callback(TimerHandle_t xTimer)
@@ -232,20 +232,20 @@ void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event)
 
 void custom_handle_mqtt_event_error(esp_mqtt_event_handle_t event)
 {
-    ESP_LOGI(TAG, "Custom handler: MQTT_EVENT_ERROR");
+    ESP_LOGE(TAG, "Custom handler: MQTT_EVENT_ERROR");
     if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS)
     {
-        ESP_LOGI(TAG, "Last ESP error code: 0x%x", event->error_handle->esp_tls_last_esp_err);
-        ESP_LOGI(TAG, "Last TLS stack error code: 0x%x", event->error_handle->esp_tls_stack_err);
-        ESP_LOGI(TAG, "Last TLS library error code: 0x%x", event->error_handle->esp_tls_cert_verify_flags);
+        ESP_LOGE(TAG, "Last ESP error code: 0x%x", event->error_handle->esp_tls_last_esp_err);
+        ESP_LOGE(TAG, "Last TLS stack error code: 0x%x", event->error_handle->esp_tls_stack_err);
+        ESP_LOGE(TAG, "Last TLS library error code: 0x%x", event->error_handle->esp_tls_cert_verify_flags);
     }
     else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED)
     {
-        ESP_LOGI(TAG, "Connection refused error: 0x%x", event->error_handle->connect_return_code);
+        ESP_LOGE(TAG, "Connection refused error: 0x%x", event->error_handle->connect_return_code);
     }
     else
     {
-        ESP_LOGI(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
+        ESP_LOGE(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
     }
     error_reload(mqtt_client_handle);
 }
@@ -299,7 +299,9 @@ void app_main()
     mqtt_set_event_data_handler(custom_handle_mqtt_event_data);
     mqtt_set_event_error_handler(custom_handle_mqtt_event_error);
 
-    mqtt_config_t config = {.certificate = (uint8_t *)certificate, .private_key = (uint8_t *)key, .broker_uri = CONFIG_IOT_ENDPOINT};
+    ESP_LOGI(TAG, "Cert size: %d, Key size: %d", sizeof(aws_certificate), sizeof(aws_key));
+
+    mqtt_config_t config = {.certificate = (uint8_t *)aws_certificate, .private_key = (uint8_t *)aws_key, .broker_uri = CONFIG_IOT_ENDPOINT};
 
     mqtt_client_handle = init_mqtt(&config);
 
