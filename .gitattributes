@@ -1,5 +1,5 @@
 main/main.h filter=git-crypt diff=git-crypt
-main/certs/* filter=git-crypt diff=git-crypt
+main/certs/** filter=git-crypt diff=git-crypt
 main/certs/original/* filter=git-crypt diff=git-crypt
 main/certs/iot-topic-policy/* filter=git-crypt diff=git-crypt
 main/certs/include/* filter=git-crypt diff=git-crypt
