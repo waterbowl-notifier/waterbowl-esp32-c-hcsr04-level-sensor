@@ -5,23 +5,23 @@ ToDo:
 - Get RGB LED working
 - Get periodic distance measurement working
 */
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "cJSON.h"
 #include "driver/gpio.h"
-#include "esp_timer.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
-#include "cJSON.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <stdio.h>
 
+#include "gecl-misc-util-manager.h"
 #include "gecl-mqtt-manager.h"
 #include "gecl-nvs-manager.h"
 #include "gecl-ota-manager.h"
 #include "gecl-rgb-led-manager.h"
 #include "gecl-time-sync-manager.h"
-#include "gecl-wifi-manager.h"
-#include "gecl-misc-util-manager.h"
 #include "gecl-ultrasonic-manager.h"
+#include "gecl-wifi-manager.h"
 
 #define ORPHAN_TIMEOUT pdMS_TO_TICKS(7200000) // 2 hours in milliseconds
 
@@ -43,28 +43,22 @@ const uint8_t *my_key = key;
 const uint8_t *my_root_ca = AmazonRootCA1_pem;
 
 // Callback function for timer expiration
-void orphan_timer_callback(TimerHandle_t xTimer)
-{
+void orphan_timer_callback(TimerHandle_t xTimer) {
     ESP_LOGE(TAG, "No status message received for 2 hours. Triggering reboot!");
     error_reload(mqtt_client_handle);
 }
 
 // Function to reset the timer whenever a message is received
-void reset_orphan_timer(void)
-{
-    if (xTimerReset(orphan_timer, 0) != pdPASS)
-    {
+void reset_orphan_timer(void) {
+    if (xTimerReset(orphan_timer, 0) != pdPASS) {
         ESP_LOGE(TAG, "Orphan timer failed to reset");
         error_reload(mqtt_client_handle);
-    }
-    else
-    {
+    } else {
         ESP_LOGI(TAG, "Orphan timer reset successfully");
     }
 }
 
-void custom_handle_mqtt_event_connected(esp_mqtt_event_handle_t event)
-{
+void custom_handle_mqtt_event_connected(esp_mqtt_event_handle_t event) {
     esp_mqtt_client_handle_t client = event->client;
     ESP_LOGI(TAG, "Custom handler: MQTT_EVENT_CONNECTED");
     int msg_id;
@@ -76,11 +70,9 @@ void custom_handle_mqtt_event_connected(esp_mqtt_event_handle_t event)
     ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, msg_id);
 }
 
-void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event)
-{
+void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event) {
     ESP_LOGI(TAG, "Custom handler: MQTT_EVENT_DISCONNECTED");
-    if (ota_task_handle != NULL)
-    {
+    if (ota_task_handle != NULL) {
         vTaskDelete(ota_task_handle);
         ota_task_handle = NULL;
     }
@@ -92,79 +84,57 @@ void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event)
     esp_mqtt_client_handle_t client = event->client;
 
     // Check if the network is connected before attempting reconnection
-    if (wifi_active())
-    {
-        do
-        {
+    if (wifi_active()) {
+        do {
             ESP_LOGI(TAG, "Attempting to reconnect, retry %d/%d", retry_count + 1, max_retries);
             err = esp_mqtt_client_reconnect(client);
-            if (err != ESP_OK)
-            {
+            if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to reconnect MQTT client, retrying in %d seconds...", retry_delay_ms / 1000);
                 vTaskDelay(pdMS_TO_TICKS(retry_delay_ms)); // Delay for 5 seconds
                 retry_count++;
             }
         } while (err != ESP_OK && retry_count < max_retries);
 
-        if (err != ESP_OK)
-        {
+        if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to reconnect MQTT client after %d retries. Restarting", retry_count);
             error_reload(mqtt_client_handle);
         }
-    }
-    else
-    {
+    } else {
         ESP_LOGE(TAG, "Network not connected, skipping MQTT reconnection");
         error_reload(mqtt_client_handle);
     }
 }
 
-void to_uppercase(char *str)
-{
-    while (*str)
-    {
+void to_uppercase(char *str) {
+    while (*str) {
         *str = toupper((unsigned char)*str);
         str++;
     }
 }
 
-void set_waterbowl_color(const char *color)
-{
+void set_waterbowl_color(const char *color) {
     to_uppercase(color);
 
-    if (strcmp(color, "RED") == 0)
-    {
+    if (strcmp(color, "RED") == 0) {
         set_rgb_led_enumerated_values(255, 0, 0, LED_STATE_BLINK, 1000);
-    }
-    else if (strcmp(color, "GREEN") == 0)
-    {
+    } else if (strcmp(color, "GREEN") == 0) {
         set_rgb_led_enumerated_values(0, 128, 0, LED_STATE_SOLID, 0);
-    }
-    else if (strcmp(color, "YELLOW") == 0)
-    {
+    } else if (strcmp(color, "YELLOW") == 0) {
         set_rgb_led_enumerated_values(255, 255, 0, LED_STATE_SOLID, 0);
-    }
-    else if (strcmp(color, "BLACK") == 0)
-    {
+    } else if (strcmp(color, "BLACK") == 0) {
         set_rgb_led_enumerated_values(0, 0, 255, LED_STATE_BLINK, 1000);
-    }
-    else
-    {
+    } else {
         ESP_LOGW(TAG, "Unknown color: %s", color);
     }
 }
 
-void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event)
-{
+void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event) {
     // Handle the status response
     cJSON *json = cJSON_Parse(event->data);
-    if (json == NULL)
-    {
+    if (json == NULL) {
         ESP_LOGE(TAG, "Failed to parse JSON");
         error_reload(mqtt_client_handle);
-    }
-    else
-    {
+    } else {
         cJSON *state = cJSON_GetObjectItem(json, "LED");
         const char *led_state = cJSON_GetStringValue(state);
         assert(led_state != NULL);
@@ -173,19 +143,15 @@ void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event)
     }
 }
 
-bool extract_ota_url_from_event(esp_mqtt_event_handle_t event, char *local_mac_address, char *ota_url)
-{
+bool extract_ota_url_from_event(esp_mqtt_event_handle_t event, char *local_mac_address, char *ota_url) {
     bool success = false;
     cJSON *root = cJSON_Parse(event->data);
     cJSON *host_key = cJSON_GetObjectItem(root, local_mac_address);
     const char *host_key_value = cJSON_GetStringValue(host_key);
 
-    if (!host_key || !host_key_value)
-    {
+    if (!host_key || !host_key_value) {
         ESP_LOGW(TAG, "'%s' MAC address key not found in JSON", local_mac_address);
-    }
-    else
-    {
+    } else {
         size_t url_len = strlen(host_key_value);
         strncpy(ota_url, host_key_value, url_len);
         ota_url[url_len] = '\0'; // Manually set the null terminator
@@ -196,13 +162,10 @@ bool extract_ota_url_from_event(esp_mqtt_event_handle_t event, char *local_mac_a
     return success;
 }
 
-void custom_handle_mqtt_event_ota(esp_mqtt_event_handle_t event, char *my_mac_address)
-{
-    if (ota_task_handle != NULL)
-    {
+void custom_handle_mqtt_event_ota(esp_mqtt_event_handle_t event, char *my_mac_address) {
+    if (ota_task_handle != NULL) {
         eTaskState task_state = eTaskGetState(ota_task_handle);
-        if (task_state != eDeleted)
-        {
+        if (task_state != eDeleted) {
             char log_message[256]; // Adjust the size according to your needs
             snprintf(log_message, sizeof(log_message),
                      "OTA task is already running or not yet cleaned up, skipping OTA update. task_state=%d",
@@ -210,15 +173,11 @@ void custom_handle_mqtt_event_ota(esp_mqtt_event_handle_t event, char *my_mac_ad
 
             ESP_LOGW(TAG, "%s", log_message);
             return;
-        }
-        else
-        {
+        } else {
             // Clean up task handle if it has been deleted
             ota_task_handle = NULL;
         }
-    }
-    else
-    {
+    } else {
         ESP_LOGI(TAG, "OTA task handle is NULL");
     }
 
@@ -229,8 +188,7 @@ void custom_handle_mqtt_event_ota(esp_mqtt_event_handle_t event, char *my_mac_ad
     ota_config_t ota_config;
     ota_config.mqtt_client = event->client;
 
-    if (!extract_ota_url_from_event(event, my_mac_address, ota_config.url))
-    {
+    if (!extract_ota_url_from_event(event, my_mac_address, ota_config.url)) {
         ESP_LOGW(TAG, "OTA URL not found in event data");
         return;
     }
@@ -238,68 +196,52 @@ void custom_handle_mqtt_event_ota(esp_mqtt_event_handle_t event, char *my_mac_ad
     set_rgb_led_named_color("LED_BLINK_GREEN");
 
     // Pass the allocated URL string to the OTA task
-    if (xTaskCreate(&ota_task, "ota_task", 8192, (void *)&ota_config, 5, &ota_task_handle) != pdPASS)
-    {
+    if (xTaskCreate(&ota_task, "ota_task", 8192, (void *)&ota_config, 5, &ota_task_handle) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create OTA task. Restarting...");
         error_reload(mqtt_client_handle);
     }
 }
 
-void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event)
-{
+void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event) {
 
     ESP_LOGW(TAG, "Received topic %.*s", event->topic_len, event->topic);
 
     // Reset the orphan timer whenever a message is received
     reset_orphan_timer();
 
-    if (ota_task_handle != NULL)
-    {
+    if (ota_task_handle != NULL) {
         ESP_LOGW(TAG, "OTA task is running, skipping message handling");
         return;
     }
 
-    if (strncmp(event->topic, CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, event->topic_len) == 0)
-    {
+    if (strncmp(event->topic, CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, event->topic_len) == 0) {
         custom_handle_mqtt_event_subscribe(event);
-    }
-    else if (strncmp(event->topic, CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, event->topic_len) == 0)
-    {
+    } else if (strncmp(event->topic, CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, event->topic_len) == 0) {
         // Use the global mac_address variable to pass the MAC address to the OTA function
         custom_handle_mqtt_event_ota(event, mac_address);
-    }
-    else
-    {
+    } else {
         ESP_LOGE(TAG, "Un-Handled topic %.*s", event->topic_len, event->topic);
     }
 }
 
-void custom_handle_mqtt_event_error(esp_mqtt_event_handle_t event)
-{
+void custom_handle_mqtt_event_error(esp_mqtt_event_handle_t event) {
     ESP_LOGE(TAG, "Custom handler: MQTT_EVENT_ERROR");
-    if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS)
-    {
+    if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
         ESP_LOGE(TAG, "Last ESP error code: 0x%x", event->error_handle->esp_tls_last_esp_err);
         ESP_LOGE(TAG, "Last TLS stack error code: 0x%x", event->error_handle->esp_tls_stack_err);
         ESP_LOGE(TAG, "Last TLS library error code: 0x%x", event->error_handle->esp_tls_cert_verify_flags);
-    }
-    else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED)
-    {
+    } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
         ESP_LOGE(TAG, "Connection refused error: 0x%x", event->error_handle->connect_return_code);
-    }
-    else
-    {
+    } else {
         ESP_LOGE(TAG, "Unknown error type: 0x%x", event->error_handle->error_type);
     }
     error_reload(mqtt_client_handle);
 }
 
-void ultrasonic_read_task(void *pvParameter)
-{
-    while (1)
-    {
+void ultrasonic_read_task(void *pvParameter) {
+    while (1) {
         // Ensure sensor is initialized
-        if (!hcsr04_is_initialized())
-        {
+        if (!hcsr04_is_initialized()) {
             hcsr04_init();
         }
 
@@ -308,16 +250,14 @@ void ultrasonic_read_task(void *pvParameter)
 
         // Prepare the payload (you can format it however you like)
         char payload[100];
-        snprintf(payload, sizeof(payload), "{\"water_level\": \"%.1f\", \"hostname\": \"%s\" }", distance, CONFIG_LOCATION);
+        snprintf(payload, sizeof(payload), "{\"water_level\": \"%.1f\", \"hostname\": \"%s\" }", distance,
+                 CONFIG_LOCATION);
 
         // Publish to MQTT topic
         int msg_id = esp_mqtt_client_publish(mqtt_client_handle, CONFIG_PUBLISH_WATER_LEVEL_TOPIC, payload, 0, 1, 0);
-        if (msg_id == -1)
-        {
+        if (msg_id == -1) {
             ESP_LOGE("MQTT", "Failed to publish message");
-        }
-        else
-        {
+        } else {
             ESP_LOGI("MQTT", "Published message: %s", payload);
         }
 
@@ -326,8 +266,7 @@ void ultrasonic_read_task(void *pvParameter)
     }
 }
 
-void app_main()
-{
+void app_main() {
     init_nvs();
 
     init_wifi();
@@ -345,10 +284,7 @@ void app_main()
     // ESP_LOGI(TAG, "Cert size: %d, Key size: %d", sizeof(certificate), sizeof(key));
 
     mqtt_config_t config = {
-        .root_ca = my_root_ca,
-        .certificate = my_cert,
-        .private_key = my_key,
-        .broker_uri = CONFIG_IOT_ENDPOINT};
+        .root_ca = my_root_ca, .certificate = my_cert, .private_key = my_key, .broker_uri = CONFIG_IOT_ENDPOINT};
 
     mqtt_client_handle = init_mqtt(&config);
 
@@ -358,23 +294,20 @@ void app_main()
     // Create an orphan timer to trigger a notification if no message is received for 2 hours
     orphan_timer = xTimerCreate("orphan_timer", ORPHAN_TIMEOUT, pdFALSE, (void *)0, orphan_timer_callback);
 
-    if (orphan_timer == NULL)
-    {
+    if (orphan_timer == NULL) {
         ESP_LOGE(TAG, "Failed to create notification timer");
         error_reload(mqtt_client_handle);
     }
 
     // Start the timer when the system boots
-    if (xTimerStart(orphan_timer, 0) != pdPASS)
-    {
+    if (xTimerStart(orphan_timer, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start notification timer");
         error_reload(mqtt_client_handle);
     }
 
     xTaskCreate(&ultrasonic_read_task, "ultrasonic_read_task", 4096, NULL, 5, NULL);
 
-    while (true)
-    {
+    while (true) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
