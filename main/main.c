@@ -252,7 +252,7 @@ void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event)
     // Reset the orphan timer whenever a message is received
     reset_orphan_timer();
 
-    if (ota_task_handle)
+    if (ota_task_handle != NULL)
     {
         ESP_LOGW(TAG, "OTA task is running, skipping message handling");
         return;
