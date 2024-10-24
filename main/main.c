@@ -119,6 +119,41 @@ void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event)
     }
 }
 
+void to_uppercase(char *str)
+{
+    while (*str)
+    {
+        *str = toupper((unsigned char)*str);
+        str++;
+    }
+}
+
+void set_waterbowl_color(const char *color)
+{
+    to_uppercase(color);
+
+    if (strcmp(color, "RED") == 0)
+    {
+        set_rgb_led_enumerated_values(255, 0, 0, LED_STATE_BLINK, 1000);
+    }
+    else if (strcmp(color, "GREEN") == 0)
+    {
+        set_rgb_led_enumerated_values(0, 128, 0, LED_STATE_SOLID, 0);
+    }
+    else if (strcmp(color, "YELLOW") == 0)
+    {
+        set_rgb_led_enumerated_values(255, 255, 0, LED_STATE_SOLID, 0);
+    }
+    else if (strcmp(color, "BLACK") == 0)
+    {
+        set_rgb_led_enumerated_values(0, 0, 255, LED_STATE_BLINK, 1000);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Unknown color: %s", color);
+    }
+}
+
 void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event)
 {
     // Handle the status response
@@ -133,7 +168,7 @@ void custom_handle_mqtt_event_subscribe(esp_mqtt_event_handle_t event)
         cJSON *state = cJSON_GetObjectItem(json, "LED");
         const char *led_state = cJSON_GetStringValue(state);
         assert(led_state != NULL);
-        set_rgb_led_named_color(led_state);
+        set_waterbowl_color(led_state);
         cJSON_Delete(json);
     }
 }
