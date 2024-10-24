@@ -61,7 +61,7 @@ jobs:
           fi
 
       # DINING
-      - name: Build for Dining Room waterbowl 
+      - name: Build for Dining Room waterbowl
         working-directory: ${{ github.workspace }}
         run: |
           docker run --rm \
@@ -83,7 +83,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         working-directory: ${{ github.workspace }}
         run: |
           aws s3 cp build/firmware.bin ${{ env.DINING_S3_PATH }}
@@ -95,7 +95,7 @@ jobs:
             /bin/bash -c ". /opt/esp-idf/export.sh && idf.py fullclean"
 
       # LIVING
-      - name: Build for Living Room waterbowl 
+      - name: Build for Living Room waterbowl
         working-directory: ${{ github.workspace }}
         run: |
           docker run --rm \
@@ -117,7 +117,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         working-directory: ${{ github.workspace }}
         run: |
           aws s3 cp build/firmware.bin ${{ env.LIVING_S3_PATH }}
@@ -141,9 +141,6 @@ jobs:
             --endpoint-url $AWS_IOT_ENDPOINT_URL \
             --topic "${{secrets.MQTT_OTA_TOPIC}}" \
             --cli-binary-format raw-in-base64-out \
-            --payload '{"${{ secrets.DINING_WIFI_MAC_ADDRESS }}": "${{ env.DINING_URL_PATH }}"}' 
-
-#
-#            --payload '{"${{ secrets.DINING_WIFI_MAC_ADDRESS }}": "${{ env.DINING_URL_PATH }}", 
-#                        "${{ secrets.LIVING_WIFI_MAC_ADDRESS }}": "${{ env.LIVING_URL_PATH }}"}'
-#
+            --payload \
+                '{"${{ secrets.DINING_WIFI_MAC_ADDRESS }}": "${{ env.DINING_URL_PATH }}", 
+                  "${{ secrets.LIVING_WIFI_MAC_ADDRESS }}": "${{ env.LIVING_URL_PATH }}"}'
