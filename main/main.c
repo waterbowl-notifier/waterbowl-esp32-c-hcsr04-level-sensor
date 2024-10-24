@@ -72,8 +72,8 @@ void custom_handle_mqtt_event_connected(esp_mqtt_event_handle_t event)
     msg_id = esp_mqtt_client_subscribe(client, CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, 0);
     ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_LED_COLOR_TOPIC, msg_id);
 
-    msg_id = esp_mqtt_client_subscribe(client, CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, 0);
-    ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, msg_id);
+    msg_id = esp_mqtt_client_subscribe(client, CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, 0);
+    ESP_LOGI(TAG, "Subscribed to topic %s, msg_id=%d", CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, msg_id);
 }
 
 void custom_handle_mqtt_event_disconnected(esp_mqtt_event_handle_t event)
@@ -255,7 +255,7 @@ void custom_handle_mqtt_event_data(esp_mqtt_event_handle_t event)
     {
         custom_handle_mqtt_event_subscribe(event);
     }
-    else if (strncmp(event->topic, CONFIG_SUBSCRIBE_OTA_RELOAD_TOPIC, event->topic_len) == 0)
+    else if (strncmp(event->topic, CONFIG_SUBSCRIBE_OTA_UPDATE_TOPIC, event->topic_len) == 0)
     {
         // Use the global mac_address variable to pass the MAC address to the OTA function
         custom_handle_mqtt_event_ota(event, mac_address);
