@@ -1,0 +1,149 @@
+name: OTA Reload on Commit
+
+on:
+  push:
+    branches:
+      - main # Adjust this to your branch if necessary
+
+jobs:
+  ota_reload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WORKFLOW_GITHUB_TOKEN }}
+          submodules: recursive
+
+      - name: Install git-crypt
+        run: sudo apt-get install git-crypt
+
+      - name: Unlock git-crypt
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "${{ secrets.GIT_CRYPT_KEY }}" | base64 --decode > git-crypt-key
+          git-crypt unlock git-crypt-key
+          rm git-crypt-key
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER_NAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Use Docker image for ESP32 build
+        run: |
+          docker pull ${{ secrets.DOCKER_USER_NAME }}/esp-idf:latest
+
+      - name: Get the current commit hash
+        id: vars
+        run: echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Tag the commit if tag doesn't exist
+        id: tag
+        run: |
+          VERSION_TAG="v1.0.0-${{ env.SHA_SHORT }}"
+          if git ls-remote --tags origin | grep -qw "refs/tags/$VERSION_TAG"; then
+            echo "Tag $VERSION_TAG already exists"
+          else
+            echo "VERSION_TAG=${VERSION_TAG}" >> $GITHUB_ENV
+            git tag -a $VERSION_TAG -m "Tagging commit ${{ env.SHA_SHORT }}"
+            git push origin $VERSION_TAG
+          fi
+
+      # DINING
+      - name: Build for Dining Room waterbowl 
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            -e COMPONENT_KCONFIGS_DIR=/workspace/components \
+            -e VERSION_TAG=${{ env.VERSION_TAG }} \
+            ${{ secrets.DOCKER_USER_NAME }}/esp-idf:latest \
+            /bin/bash -c ". /opt/esp-idf/export.sh && git config --global --add safe.directory /workspace && idf.py -D SDKCONFIG=sdkconfig.dining build"
+
+      - name: Append Dining Room S3/URL path to environment
+        working-directory: ${{ github.workspace }}
+        run: |
+          DINING_S3_IMAGE=home/dining-room/water-bowl/${{ env.VERSION_TAG}}/firmware.bin
+          echo "DINING_S3_PATH=s3://${{ secrets.AWS_S3_OTA_BUCKET }}/${DINING_S3_IMAGE}" >> $GITHUB_ENV
+          echo "DINING_URL_PATH=https://${{ secrets.AWS_S3_OTA_BUCKET }}.s3.${{ secrets.AWS_REGION }}.amazonaws.com/${DINING_S3_IMAGE}" >> $GITHUB_ENV
+
+      - name: Upload Dining Room Waterbowl image to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
+        working-directory: ${{ github.workspace }}
+        run: |
+          aws s3 cp build/firmware.bin ${{ env.DINING_S3_PATH }}
+
+      - name: Clean build directory
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm -v $PWD:/workspace -w /workspace ${{ secrets.DOCKER_USER_NAME }}/esp-idf:latest \
+            /bin/bash -c ". /opt/esp-idf/export.sh && idf.py fullclean"
+
+      # LIVING
+      - name: Build for Living Room waterbowl 
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            -e COMPONENT_KCONFIGS_DIR=/workspace/components \
+            -e VERSION_TAG=${{ env.VERSION_TAG }} \
+            ${{ secrets.DOCKER_USER_NAME }}/esp-idf:latest \
+            /bin/bash -c ". /opt/esp-idf/export.sh && git config --global --add safe.directory /workspace && idf.py -D SDKCONFIG=sdkconfig.living build"
+
+      - name: Append Living Room Waterbowl S3/URL path to environment
+        working-directory: ${{ github.workspace }}
+        run: |
+          LIVING_S3_IMAGE=home/living-room/water-bowl/${{ env.VERSION_TAG}}/firmware.bin
+          echo "LIVING_S3_PATH=s3://${{ secrets.AWS_S3_OTA_BUCKET }}/${LIVING_S3_IMAGE}" >> $GITHUB_ENV
+          echo "LIVING_URL_PATH=https://${{ secrets.AWS_S3_OTA_BUCKET }}.s3.${{ secrets.AWS_REGION }}.amazonaws.com/${LIVING_S3_IMAGE}" >> $GITHUB_ENV
+
+      - name: Upload Living Room Waterbowl image to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
+        working-directory: ${{ github.workspace }}
+        run: |
+          aws s3 cp build/firmware.bin ${{ env.LIVING_S3_PATH }}
+
+      - name: Clean build directory
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm -v $PWD:/workspace -w /workspace ${{ secrets.DOCKER_USER_NAME }}/esp-idf:latest \
+            /bin/bash -c ". /opt/esp-idf/export.sh && idf.py fullclean"
+
+      # PUBLISH
+      - name: Publish MQTT message
+        env:
+          AWS_IOT_ENDPOINT_URL: "https://${{ secrets.AWS_IOT_ENDPOINT }}"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          aws iot-data publish \
+            --endpoint-url $AWS_IOT_ENDPOINT_URL \
+            --topic "${{secrets.MQTT_OTA_TOPIC}}" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"${{ secrets.DINING_WIFI_MAC_ADDRESS }}": "${{ env.DINING_URL_PATH }}"}' 
+
+#
+#            --payload '{"${{ secrets.DINING_WIFI_MAC_ADDRESS }}": "${{ env.DINING_URL_PATH }}", 
+#                        "${{ secrets.LIVING_WIFI_MAC_ADDRESS }}": "${{ env.LIVING_URL_PATH }}"}'
+#
